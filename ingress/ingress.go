@@ -437,6 +437,11 @@ func validateIngress(ingress []config.UnvalidatedIngressRule, defaults OriginReq
 			}
 		}
 
+		accessControl, err := parseAccessControl(r.AccessControl)
+		if err != nil {
+			return Ingress{}, fmt.Errorf("rule #%d has an invalid accessControl: %w", i+1, err)
+		}
+
 		if err := validateHostname(r, i, len(ingress)); err != nil {
 			return Ingress{}, err
 		}
@@ -468,6 +473,7 @@ func validateIngress(ingress []config.UnvalidatedIngressRule, defaults OriginReq
 			Path:             pathRegexp,
 			Handlers:         handlers,
 			Config:           cfg,
+			AccessControl:    accessControl,
 		}
 	}
 	return Ingress{Rules: rules, Defaults: defaults}, nil

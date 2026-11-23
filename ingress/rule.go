@@ -30,6 +30,10 @@ type Rule struct {
 
 	// Configure the request cloudflared sends to this specific origin.
 	Config OriginRequestConfig `json:"originRequest"`
+
+	// AccessControl optionally restricts requests by path and HTTP method.
+	// A nil value preserves the behavior of ingress rules without ACLs.
+	AccessControl *AccessControl `json:"accessControl,omitempty"`
 }
 
 // MultiLineString is for outputting rules in a human-friendly way when Cloudflared

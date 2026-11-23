@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 	"go.opentelemetry.io/otel/attribute"
@@ -44,6 +45,7 @@ type Proxy struct {
 	flowLimiter           cfdflow.Limiter
 	httpRequestAuthorizer connection.HTTPRequestAuthorizer
 	log                   *zerolog.Logger
+	sessionID             string
 }
 
 // NewOriginProxy returns a new instance of the Proxy struct.
@@ -82,6 +84,7 @@ func NewOriginProxyWithHTTPRequestAuthorizer(
 		flowLimiter:           flowLimiter,
 		httpRequestAuthorizer: httpRequestAuthorizer,
 		log:                   log,
+		sessionID:             uuid.NewString(),
 	}
 }
 
@@ -137,6 +140,24 @@ func (p *Proxy) ProxyHTTP(
 	ruleSpan.End()
 	logger := newHTTPLogger(p.log, tr.ConnIndex, req, ruleNum, rule.Service.String())
 	logHTTPRequest(&logger, req)
+
+	accessDecision := rule.CheckAccess(req.Method, req.URL)
+	var auditWriter *accessAuditWriter
+	if accessDecision.Configured {
+		auditWriter = &accessAuditWriter{ResponseWriter: w}
+		w = auditWriter
+		start := time.Now()
+		defer func() {
+			p.logAccessAudit(&logger, req, tr.ConnIndex, ruleNum, rule.Service.String(), accessDecision, auditWriter.Status(), time.Since(start))
+		}()
+	}
+	if accessDecision.Configured && !accessDecision.Allowed {
+		if err := w.WriteRespHeaders(http.StatusForbidden, nil); err != nil {
+			return errors.Wrap(err, "error writing access control rejection")
+		}
+		return nil
+	}
+
 	if err, applied := p.applyIngressMiddleware(rule, req, w); err != nil {
 		if applied {
 			logRequestError(&logger, err)

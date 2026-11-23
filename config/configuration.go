@@ -179,10 +179,29 @@ func ValidateUrl(c *cli.Context, allowURLFromArgs bool) (*url.URL, error) {
 }
 
 type UnvalidatedIngressRule struct {
-	Hostname      string              `json:"hostname,omitempty"`
-	Path          string              `json:"path,omitempty"`
-	Service       string              `json:"service,omitempty"`
-	OriginRequest OriginRequestConfig `yaml:"originRequest" json:"originRequest"`
+	Hostname      string               `json:"hostname,omitempty"`
+	Path          string               `json:"path,omitempty"`
+	Service       string               `json:"service,omitempty"`
+	AccessControl *AccessControlConfig `yaml:"accessControl" json:"accessControl,omitempty"`
+	OriginRequest OriginRequestConfig  `yaml:"originRequest" json:"originRequest"`
+}
+
+// AccessControlConfig defines path and method based access control for an
+// ingress rule. If no rule matches, Default is applied. An empty Default
+// denies the request.
+type AccessControlConfig struct {
+	Default string              `yaml:"default" json:"default,omitempty"`
+	Rules   []AccessControlRule `yaml:"rules" json:"rules"`
+}
+
+// AccessControlRule allows or denies requests matching both Path and Methods.
+// Path is a regular expression, consistent with ingress rule paths. An empty
+// Path matches every path. Methods are compared case-insensitively; an empty
+// list or "*" matches every method.
+type AccessControlRule struct {
+	Path    string   `yaml:"path" json:"path,omitempty"`
+	Methods []string `yaml:"methods" json:"methods,omitempty"`
+	Action  string   `yaml:"action" json:"action"`
 }
 
 // OriginRequestConfig is a set of optional fields that users may set to
